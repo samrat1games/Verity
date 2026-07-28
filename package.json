@@ -1,0 +1,20 @@
+{
+  "name": "verity",
+  "short_name": "Verity",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#050508",
+  "theme_color": "#050508",
+  "icons": [
+    {
+      "src": "verity_files/photo/happy.jpeg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "verity_files/photo/happy.jpeg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}

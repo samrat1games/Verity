@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verity - Desktop Pet</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #050508;
+            overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
+            color: #d1d1d1;
+        }
+
+        #mystery-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 220px;
+            height: 220px;
+            background-image: url('verity_files/photo/box.jpeg');
+            background-size: cover;
+            background-position: center;
+            cursor: pointer;
+            transition: transform 0.1s;
+            z-index: 50;
+        }
+
+        #mystery-box:hover {
+            transform: translate(-50%, -50%) scale(1.05);
+        }
+
+        #flash-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: white;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 999;
+            transition: opacity 0.05s ease-out;
+        }
+
+        #verity {
+            position: absolute;
+            width: 110px;
+            height: 110px;
+            cursor: grab;
+            display: none;
+            z-index: 60;
+            touch-action: none;
+        }
+
+        #verity:active {
+            cursor: grabbing;
+        }
+
+        #verity-icon {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+        }
+
+        #chat-container {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 80;
+            width: 400px;
+            max-width: 90vw;
+        }
+
+        #speech-bubble {
+            background: rgba(18, 14, 26, 0.95);
+            border: 2px solid #523a63;
+            padding: 10px 14px;
+            font-size: 14px;
+            color: #f0e6ff;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.7);
+            word-wrap: break-word;
+        }
+
+        #chat-form {
+            display: flex;
+            gap: 5px;
+        }
+
+        #chat-input {
+            flex: 1;
+            background: rgba(10, 8, 15, 0.9);
+            border: 2px solid #523a63;
+            color: #fff;
+            padding: 8px 12px;
+            font-family: inherit;
+            outline: none;
+        }
+
+        #chat-submit {
+            background: #3a2647;
+            border: 2px solid #523a63;
+            color: #fff;
+            padding: 8px 14px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        #chat-submit:hover {
+            background: #4c325e;
+        }
+
+        .particle {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: #ff5500;
+            pointer-events: none;
+            z-index: 90;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="flash-overlay"></div>
+    <div id="mystery-box"></div>
+
+    <div id="verity">
+        <img id="verity-icon" src="verity_files/photo/happy.jpeg" alt="Verity">
+    </div>
+
+    <div id="chat-container">
+        <div id="speech-bubble">Hi im verity ask me anything i know everything</div>
+        <form id="chat-form">
+            <input type="text" id="chat-input" placeholder="Ask Verity..." autocomplete="off">
+            <button type="submit" id="chat-submit">Send</button>
+        </form>
+    </div>
+
+    <script>
+        const mysteryBox = document.getElementById('mystery-box');
+        const flashOverlay = document.getElementById('flash-overlay');
+        const verity = document.getElementById('verity');
+        const verityIcon = document.getElementById('verity-icon');
+        const chatContainer = document.getElementById('chat-container');
+        const speechBubble = document.getElementById('speech-bubble');
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+
+        let isSpawned = false;
+        let commandsData = {};
+        
+        let posX = window.innerWidth / 2 - 55;
+        let posY = window.innerHeight / 2 - 55;
+        let velX = 0;
+        let velY = 0;
+        let isDragging = false;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+        let lastMouseX = 0;
+        let lastMouseY = 0;
+        let mouseVelX = 0;
+        let mouseVelY = 0;
+
+        let aiTimer = 0;
+        let currentBehavior = 'stalk';
+
+        const icons = {
+            normal: 'verity_files/photo/normal.jpeg',
+            happy: 'verity_files/photo/happy.jpeg',
+            sad: 'verity_files/photo/sad.jpeg',
+            verySad: 'verity_files/photo/very-sad.jpeg',
+            angry: 'verity_files/photo/angry.jpeg',
+            ouch: 'verity_files/photo/ouch.jpeg',
+            sadTalking: 'verity_files/photo/sad-talking.jpeg',
+            verySadTalking: 'verity_files/photo/very-sad-talking.jpeg'
+        };
+
+        async function loadCommands() {
+            try {
+                const response = await fetch('verity_files/c.json');
+                commandsData = await response.json();
+            } catch (e) {
+                commandsData = {
+                    "default": { "text": "I know everything, but I choose to stay silent on that.", "icon": "normal" },
+                    "hello": { "text": "Hello, wanderer. Do you like it here?", "icon": "happy" }
+                };
+            }
+        }
+        loadCommands();
+
+        mysteryBox.addEventListener('click', () => {
+            mysteryBox.style.pointerEvents = 'none';
+            mysteryBox.style.transform = 'translate(-50%, -50%) scale(1.2)';
+            
+            setTimeout(() => {
+                triggerCreeperExplosion();
+            }, 2000);
+        });
+
+        function triggerCreeperExplosion() {
+            flashOverlay.style.opacity = '1';
+            setTimeout(() => {
+                flashOverlay.style.opacity = '0';
+            }, 100);
+
+            createExplosionParticles(window.innerWidth / 2, window.innerHeight / 2);
+
+            mysteryBox.style.display = 'none';
+            
+            posX = window.innerWidth / 2 - 55;
+            posY = window.innerHeight / 2 - 55;
+            verity.style.display = 'block';
+            chatContainer.style.display = 'flex';
+            isSpawned = true;
+            verityIcon.src = icons.happy;
+        }
+
+        function createExplosionParticles(x, y) {
+            for (let i = 0; i < 40; i++) {
+                const p = document.createElement('div');
+                p.classList.add('particle');
+                document.body.appendChild(p);
+                
+                let pX = x;
+                let pY = y;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 12 + 2;
+                let vx = Math.cos(angle) * speed;
+                let vy = Math.sin(angle) * speed;
+                let life = 40;
+
+                const anim = setInterval(() => {
+                    pX += vx;
+                    pY += vy;
+                    vy += 0.4;
+                    life--;
+                    p.style.left = pX + 'px';
+                    p.style.top = pY + 'px';
+                    p.style.opacity = life / 40;
+
+                    if (life <= 0) {
+                        clearInterval(anim);
+                        p.remove();
+                    }
+                }, 20);
+            }
+        }
+
+        verity.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            velX = 0;
+            velY = 0;
+            dragOffsetX = e.clientX - posX;
+            dragOffsetY = e.clientY - posY;
+            verityIcon.src = icons.ouch;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            mouseVelX = e.clientX - lastMouseX;
+            mouseVelY = e.clientY - lastMouseY;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+
+            posX = e.clientX - dragOffsetX;
+            posY = e.clientY - dragOffsetY;
+            
+            verity.style.left = posX + 'px';
+            verity.style.top = posY + 'px';
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (!isDragging) return;
+            isDragging = false;
+            
+            velX = mouseVelX * 1.2;
+            velY = mouseVelY * 1.2;
+
+            setTimeout(() => {
+                if (!isDragging) verityIcon.src = icons.angry;
+            }, 500);
+        });
+
+        let globalMouseX = window.innerWidth / 2;
+        let globalMouseY = window.innerHeight / 2;
+        window.addEventListener('mousemove', (e) => {
+            globalMouseX = e.clientX;
+            globalMouseY = e.clientY;
+        });
+
+        function updatePhysics() {
+            if (isSpawned && !isDragging) {
+                aiTimer++;
+                if (aiTimer > 240) {
+                    aiTimer = 0;
+                    const rand = Math.random();
+                    if (rand < 0.4) {
+                        currentBehavior = 'stalk';
+                        verityIcon.src = icons.normal;
+                    } else if (rand < 0.7) {
+                        currentBehavior = 'wander';
+                        verityIcon.src = icons.sad;
+                    } else {
+                        currentBehavior = 'idle';
+                        verityIcon.src = icons.happy;
+                    }
+                }
+
+                if (currentBehavior === 'stalk') {
+                    let dx = globalMouseX - (posX + 55);
+                    let dy = globalMouseY - (posY + 55);
+                    velX += dx * 0.001;
+                    velY += dy * 0.001;
+                } else if (currentBehavior === 'wander') {
+                    if (Math.random() < 0.05) {
+                        velX += (Math.random() - 0.5) * 4;
+                        velY += (Math.random() - 0.5) * 4;
+                    }
+                }
+
+                velX *= 0.92;
+                velY *= 0.92;
+
+                posX += velX;
+                posY += velY;
+
+                const maxX = window.innerWidth - 110;
+                const maxY = window.innerHeight - 110 - chatContainer.offsetHeight - 20;
+
+                if (posX <= 0) { posX = 0; velX = -velX * 0.7; } 
+                else if (posX >= maxX) { posX = maxX; velX = -velX * 0.7; }
+
+                if (posY <= 0) { posY = 0; velY = -velY * 0.7; } 
+                else if (posY >= maxY) { posY = maxY; velY = -velY * 0.7; }
+
+                verity.style.left = posX + 'px';
+                verity.style.top = posY + 'px';
+            }
+
+            requestAnimationFrame(updatePhysics);
+        }
+
+        requestAnimationFrame(updatePhysics);
+
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const text = chatInput.value.trim().toLowerCase();
+            if (!text) return;
+
+            chatInput.value = '';
+
+            let responseObj = null;
+            for (let key in commandsData) {
+                if (text.includes(key)) {
+                    responseObj = commandsData[key];
+                    break;
+                }
+            }
+
+            if (!responseObj && commandsData["default"]) {
+                responseObj = commandsData["default"];
+            } else if (!responseObj) {
+                responseObj = { text: "I don't have an answer for that.", icon: "sad" };
+            }
+
+            speechBubble.innerText = responseObj.text;
+            if (icons[responseObj.icon]) {
+                verityIcon.src = icons[responseObj.icon];
+            } else {
+                verityIcon.src = icons.normal;
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            if (posX > window.innerWidth - 110) posX = window.innerWidth - 110;
+            if (posY > window.innerHeight - 110) posY = window.innerHeight - 110;
+        });
+    </script>
+</body>
+</html>
