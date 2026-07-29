@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+    <link rel="manifest" href="/manifest.json">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Verity - Питомцев</title>
@@ -367,6 +368,7 @@
     </style>
 </head>
 <body>
+    
 
     <div id="flash-overlay"></div>
     <button id="settings-btn">⚙️ Настройки</button>
@@ -834,6 +836,17 @@
             if (posX > window.innerWidth - 110) posX = window.innerWidth - 110;
             if (posY > window.innerHeight - 110) posY = window.innerHeight - 110;
         });
+        if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/verity/sw.js')
+            .then((reg) => {
+                console.log('Service Worker зарегистрирован для:', reg.scope);
+            })
+            .catch((err) => {
+                console.log('Ошибка регистрации Service Worker:', err);
+            });
+        });
+        }
     </script>
 </body>
 </html>
