@@ -1,13 +1,61 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Verity - Desktop Pet</title>
+    <title>Verity - Питомцев</title>
     <style>
         * {
             box-sizing: border-box;
             user-select: none;
+        }
+
+        :root {
+            --bg-color: #050508;
+            --panel-bg: rgba(18, 14, 26, 0.95);
+            --panel-border: #523a63;
+            --text-color: #f0e6ff;
+            --input-bg: rgba(10, 8, 15, 0.9);
+            --btn-bg: #3a2647;
+            --btn-hover: #4c325e;
+            --border-radius: 0px;
+            --font-family: 'Courier New', Courier, monospace;
+        }
+
+        /* Material You Design Theme: черный фон и фиолетовые элементы без лишних эффектов */
+        body.theme-material {
+            --bg-color: #000000;
+            --panel-bg: #1d1824;
+            --panel-border: #4f3768;
+            --text-color: #eaddff;
+            --input-bg: #14101a;
+            --btn-bg: #4f3768;
+            --btn-hover: #654c7d;
+            --border-radius: 20px;
+            --font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        /* Liquid Glass Theme: жидкое, полностью прозрачное стекло */
+        body.theme-glass {
+            --bg-color: #050508;
+            --panel-bg: rgba(255, 255, 255, 0.03);
+            --panel-border: rgba(255, 255, 255, 0.1);
+            --text-color: #ffffff;
+            --input-bg: rgba(255, 255, 255, 0.02);
+            --btn-bg: rgba(255, 255, 255, 0.06);
+            --btn-hover: rgba(255, 255, 255, 0.15);
+            --border-radius: 16px;
+            --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        body.theme-glass #settings-panel,
+        body.theme-glass #settings-btn,
+        body.theme-glass #about-modal,
+        body.theme-glass #speech-bubble,
+        body.theme-glass #chat-input,
+        body.theme-glass .material-pill-btn {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
         }
 
         body {
@@ -15,10 +63,11 @@
             padding: 0;
             width: 100vw;
             height: 100vh;
-            background-color: #050508;
+            background-color: var(--bg-color);
             overflow: hidden;
-            font-family: 'Courier New', Courier, monospace;
-            color: #d1d1d1;
+            font-family: var(--font-family);
+            color: var(--text-color);
+            transition: background-color 0.3s ease, font-family 0.3s ease;
         }
 
         #mystery-box {
@@ -32,7 +81,8 @@
             background-size: cover;
             background-position: center;
             cursor: pointer;
-            transition: transform 0.1s;
+            border: none;
+            outline: none;
             z-index: 50;
         }
 
@@ -45,7 +95,7 @@
             top: 0;
             left: 0;
             width: 100vw;
-            height: 100vh;
+            height: 100vw;
             background: white;
             opacity: 0;
             pointer-events: none;
@@ -74,55 +124,236 @@
             pointer-events: none;
         }
 
+        #settings-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--panel-bg);
+            border: 2px solid var(--panel-border);
+            color: var(--text-color);
+            padding: 10px 16px;
+            cursor: pointer;
+            font-family: var(--font-family);
+            border-radius: var(--border-radius);
+            z-index: 100;
+        }
+
+        #settings-btn:hover {
+            background: var(--btn-hover);
+        }
+
+        #settings-panel {
+            position: absolute;
+            top: 75px;
+            right: 20px;
+            background: var(--panel-bg);
+            border: 2px solid var(--panel-border);
+            padding: 18px;
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 100;
+            width: 220px;
+            border-radius: var(--border-radius);
+        }
+
+        #settings-panel label {
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .menu-link {
+            background: none;
+            border: none;
+            color: var(--text-color);
+            font-family: var(--font-family);
+            font-size: 14px;
+            cursor: pointer;
+            text-align: left;
+            padding: 4px 0;
+            text-decoration: underline;
+        }
+
+        /* About Modal */
+        #about-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--panel-bg);
+            border: 2px solid var(--panel-border);
+            padding: 25px;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            z-index: 1000;
+            max-width: 90vw;
+            width: 340px;
+            border-radius: var(--border-radius);
+        }
+
+        /* Черная карточка внутри модального окна */
+        #about-card {
+            background-color: #000000;
+            color: #eaddff;
+            border: 2px solid var(--panel-border);
+            padding: 20px;
+            width: 100%;
+            text-align: center;
+            border-radius: 12px;
+            font-family: var(--font-family);
+        }
+
+        #about-card h1 {
+            margin: 0 0 15px 0;
+            font-size: 28px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            color: #ffffff;
+        }
+
+        .dev-link {
+            display: block;
+            margin-top: 10px;
+            color: #bb86fc;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .dev-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Вращающийся верити */
+        #about-verity-container {
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #about-verity-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            animation: spinVerity 3s linear infinite;
+        }
+
+        @keyframes spinVerity {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #about-close {
+            background: var(--btn-bg);
+            border: 1px solid var(--panel-border);
+            color: var(--text-color);
+            padding: 8px 20px;
+            cursor: pointer;
+            font-family: var(--font-family);
+            border-radius: var(--border-radius);
+        }
+
+        #about-close:hover {
+            background: var(--btn-hover);
+        }
+
         #chat-container {
             position: absolute;
-            bottom: 20px;
+            bottom: 25px;
             left: 50%;
             transform: translateX(-50%);
             display: none;
             flex-direction: column;
-            gap: 8px;
+            gap: 10px;
             z-index: 80;
-            width: 400px;
-            max-width: 90vw;
+            width: 450px;
+            max-width: 95vw;
+            align-items: center;
         }
 
         #speech-bubble {
-            background: rgba(18, 14, 26, 0.95);
-            border: 2px solid #523a63;
-            padding: 10px 14px;
+            background: var(--panel-bg);
+            border: 2px solid var(--panel-border);
+            padding: 12px 16px;
             font-size: 14px;
-            color: #f0e6ff;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.7);
+            color: var(--text-color);
             word-wrap: break-word;
+            width: 100%;
+            border-radius: var(--border-radius);
         }
 
-        #chat-form {
+        .material-pill-bar {
             display: flex;
-            gap: 5px;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            background: var(--panel-bg);
+            border: 2px solid var(--panel-border);
+            padding: 8px 16px;
+            border-radius: var(--border-radius);
+            width: 100%;
+        }
+
+        .material-pill-btn {
+            background: var(--btn-bg);
+            border: 1px solid var(--panel-border);
+            color: var(--text-color);
+            width: 48px;
+            height: 48px;
+            border-radius: var(--border-radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .material-pill-btn:hover {
+            background: var(--btn-hover);
+        }
+
+        #center-pill-display {
+            flex: 1;
+            height: 52px;
+            background: var(--input-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--border-radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 10px;
+            position: relative;
+            overflow: hidden;
         }
 
         #chat-input {
-            flex: 1;
-            background: rgba(10, 8, 15, 0.9);
-            border: 2px solid #523a63;
-            color: #fff;
-            padding: 8px 12px;
-            font-family: inherit;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            border: none;
+            color: var(--text-color);
+            font-family: var(--font-family);
+            font-size: 14px;
+            text-align: center;
             outline: none;
         }
 
-        #chat-submit {
-            background: #3a2647;
-            border: 2px solid #523a63;
-            color: #fff;
-            padding: 8px 14px;
-            cursor: pointer;
-            font-family: inherit;
+        #chat-input::placeholder {
+            color: var(--text-color);
+            opacity: 0.6;
         }
 
-        #chat-submit:hover {
-            background: #4c325e;
+        #mic-btn.listening {
+            background: #ff4444 !important;
+            color: #fff;
         }
 
         .particle {
@@ -138,6 +369,32 @@
 <body>
 
     <div id="flash-overlay"></div>
+    <button id="settings-btn">⚙️ Настройки</button>
+
+    <div id="settings-panel">
+        <strong>Тема оформления</strong>
+        <label><input type="radio" name="theme" value="default" checked> Классическая</label>
+        <label><input type="radio" name="theme" value="material"> Material You</label>
+        <label><input type="radio" name="theme" value="glass"> Жидкое стекло</label>
+        <hr style="border-color: var(--panel-border); margin: 5px 0;">
+        <button class="menu-link" id="about-btn">О приложении</button>
+    </div>
+
+    <!-- Модальное окно "О приложении" -->
+    <div id="about-modal">
+        <div id="about-card">
+            <h1>Verity<br>1.0.0</h1>
+            <a href="https://t.me/Beketov_samrat" target="_blank" class="dev-link">By Samrat</a>
+            <a href="https://t.me/Denkvant50" target="_blank" class="dev-link">By @Denkvant50</a>
+        </div>
+        
+        <div id="about-verity-container">
+            <img id="about-verity-img" src="verity_files/photo/happy.jpeg" alt="Веселый Verity">
+        </div>
+
+        <button id="about-close">Закрыть</button>
+    </div>
+
     <div id="mystery-box"></div>
 
     <div id="verity">
@@ -146,9 +403,15 @@
 
     <div id="chat-container">
         <div id="speech-bubble">Hi im verity ask me anything i know everything</div>
-        <form id="chat-form">
-            <input type="text" id="chat-input" placeholder="Ask Verity..." autocomplete="off">
-            <button type="submit" id="chat-submit">Send</button>
+        
+        <form id="chat-form" class="material-pill-bar">
+            <button type="submit" id="chat-submit" class="material-pill-btn" title="Отправить">⌨️</button>
+            
+            <div id="center-pill-display">
+                <input type="text" id="chat-input" placeholder="Введите сообщение..." autocomplete="off">
+            </div>
+
+            <button type="button" id="mic-btn" class="material-pill-btn" title="Голосовой ввод">🎤</button>
         </form>
     </div>
 
@@ -161,10 +424,19 @@
         const speechBubble = document.getElementById('speech-bubble');
         const chatForm = document.getElementById('chat-form');
         const chatInput = document.getElementById('chat-input');
+        const micBtn = document.getElementById('mic-btn');
+        
+        const settingsBtn = document.getElementById('settings-btn');
+        const settingsPanel = document.getElementById('settings-panel');
+        const themeRadios = document.querySelectorAll('input[name="theme"]');
+        const aboutBtn = document.getElementById('about-btn');
+        const aboutModal = document.getElementById('about-modal');
+        const aboutClose = document.getElementById('about-close');
 
         let isSpawned = false;
         let commandsData = {};
-        
+        let appsData = {};
+
         let posX = window.innerWidth / 2 - 55;
         let posY = window.innerHeight / 2 - 55;
         let velX = 0;
@@ -191,18 +463,178 @@
             verySadTalking: 'verity_files/photo/very-sad-talking.jpeg'
         };
 
-        async function loadCommands() {
+        // Восстановление темы из памяти
+        const savedTheme = localStorage.getItem('verity_theme') || 'default';
+        if (savedTheme !== 'default') {
+            document.body.classList.add(`theme-${savedTheme}`);
+        }
+        themeRadios.forEach(radio => {
+            if (radio.value === savedTheme) {
+                radio.checked = true;
+            }
+            radio.addEventListener('change', (e) => {
+                const theme = e.target.value;
+                document.body.className = '';
+                if (theme === 'material') {
+                    document.body.classList.add('theme-material');
+                } else if (theme === 'glass') {
+                    document.body.classList.add('theme-glass');
+                }
+                localStorage.setItem('verity_theme', theme);
+            });
+        });
+
+        // Проверка: была ли коробка открыта ранее
+        const isBoxOpened = localStorage.getItem('verity_box_opened') === 'true';
+        if (isBoxOpened) {
+            mysteryBox.style.display = 'none';
+            verity.style.display = 'block';
+            chatContainer.style.display = 'flex';
+            isSpawned = true;
+        }
+
+        settingsBtn.addEventListener('click', () => {
+            settingsPanel.style.display = settingsPanel.style.display === 'flex' ? 'none' : 'flex';
+        });
+
+        aboutBtn.addEventListener('click', () => {
+            settingsPanel.style.display = 'none';
+            aboutModal.style.display = 'flex';
+        });
+
+        aboutClose.addEventListener('click', () => {
+            aboutModal.style.display = 'none';
+        });
+
+        let recognition = null;
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'ru-RU';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.onresult = (event) => {
+                const speechResult = event.results[0][0].transcript;
+                chatInput.value = speechResult;
+                processUserQuery(speechResult);
+                micBtn.classList.remove('listening');
+            };
+
+            recognition.onerror = () => {
+                micBtn.classList.remove('listening');
+            };
+
+            recognition.onend = () => {
+                micBtn.classList.remove('listening');
+            };
+        }
+
+        micBtn.addEventListener('click', () => {
+            if (!recognition) {
+                alert('Голосовой ввод не поддерживается вашим браузером.');
+                return;
+            }
             try {
-                const response = await fetch('verity_files/c.json');
-                commandsData = await response.json();
+                micBtn.classList.add('listening');
+                recognition.start();
+            } catch (e) {
+                micBtn.classList.remove('listening');
+            }
+        });
+
+        async function loadData() {
+            try {
+                const resCmd = await fetch('verity_files/c.json');
+                commandsData = await resCmd.json();
             } catch (e) {
                 commandsData = {
-                    "default": { "text": "I know everything, but I choose to stay silent on that.", "icon": "normal" },
-                    "hello": { "text": "Hello, wanderer. Do you like it here?", "icon": "happy" }
+                    "default": { "text": "Я знаю всё, но предпочитаю молчать об этом.", "icon": "normal" },
+                    "привет": { "text": "Привет, странник. Тебе здесь нравится?", "icon": "happy" },
+                    "помощь": { "text": "Никто не сможет помочь тебе выбраться отсюда.", "icon": "angry" }
                 };
             }
+
+            try {
+                const resApps = await fetch('verity_files/apps.json');
+                appsData = await resApps.json();
+            } catch (e) {
+                appsData = {};
+            }
         }
-        loadCommands();
+        loadData();
+
+        function findApp(input) {
+            input = input.toLowerCase().trim();
+            for (let appName in appsData) {
+                if (input.includes(appName) || appName.includes(input)) {
+                    return appsData[appName];
+                }
+            }
+            return null;
+        }
+
+        function findBestMatch(input) {
+            input = input.toLowerCase().trim();
+            if (commandsData[input]) return commandsData[input];
+
+            let bestMatchKey = null;
+            let highestSimilarity = 0;
+
+            for (let key in commandsData) {
+                if (key === 'default') continue;
+                if (input.includes(key) || key.includes(input)) {
+                    return commandsData[key];
+                }
+
+                let similarity = getSimilarity(input, key);
+                if (similarity > 0.55 && similarity > highestSimilarity) {
+                    highestSimilarity = similarity;
+                    bestMatchKey = key;
+                }
+            }
+
+            if (bestMatchKey) {
+                return commandsData[bestMatchKey];
+            }
+
+            return commandsData["default"] || { text: "У меня нет ответа на это.", icon: "sad" };
+        }
+
+        function getSimilarity(s1, s2) {
+            let longer = s1;
+            let shorter = s2;
+            if (s1.length < s2.length) {
+                longer = s2;
+                shorter = s1;
+            }
+            let longerLength = longer.length;
+            if (longerLength === 0) return 1.0;
+            return (longerLength - editDistance(longer, shorter)) / parseFloat(longerLength);
+        }
+
+        function editDistance(s1, s2) {
+            s1 = s1.toLowerCase();
+            s2 = s2.toLowerCase();
+            let costs = [];
+            for (let i = 0; i <= s1.length; i++) {
+                let lastValue = i;
+                for (let j = 0; j <= s2.length; j++) {
+                    if (i === 0) costs[j] = j;
+                    else {
+                        if (j > 0) {
+                            let newValue = costs[j - 1];
+                            if (s1.charAt(i - 1) !== s2.charAt(j - 1))
+                                newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+                            costs[j - 1] = lastValue;
+                            lastValue = newValue;
+                        }
+                    }
+                }
+                if (i > 0) costs[s2.length] = lastValue;
+            }
+            return costs[s2.length];
+        }
 
         mysteryBox.addEventListener('click', () => {
             mysteryBox.style.pointerEvents = 'none';
@@ -222,6 +654,7 @@
             createExplosionParticles(window.innerWidth / 2, window.innerHeight / 2);
 
             mysteryBox.style.display = 'none';
+            localStorage.setItem('verity_box_opened', 'true');
             
             posX = window.innerWidth / 2 - 55;
             posY = window.innerHeight / 2 - 55;
@@ -342,7 +775,7 @@
                 posY += velY;
 
                 const maxX = window.innerWidth - 110;
-                const maxY = window.innerHeight - 110 - chatContainer.offsetHeight - 20;
+                const maxY = window.innerHeight - 110 - chatContainer.offsetHeight - 25;
 
                 if (posX <= 0) { posX = 0; velX = -velX * 0.7; } 
                 else if (posX >= maxX) { posX = maxX; velX = -velX * 0.7; }
@@ -359,33 +792,42 @@
 
         requestAnimationFrame(updatePhysics);
 
-        chatForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const text = chatInput.value.trim().toLowerCase();
+        function processUserQuery(text) {
             if (!text) return;
+            let cleanText = text.toLowerCase().trim();
 
-            chatInput.value = '';
-
-            let responseObj = null;
-            for (let key in commandsData) {
-                if (text.includes(key)) {
-                    responseObj = commandsData[key];
-                    break;
-                }
+            // Попытка найти приложение из apps.json напрямую или по команде "открой"
+            let appUrl = findApp(cleanText);
+            if (!appUrl && cleanText.includes('открой')) {
+                let queryWithoutOpen = cleanText.replace('открой', '').trim();
+                appUrl = findApp(queryWithoutOpen);
             }
 
-            if (!responseObj && commandsData["default"]) {
-                responseObj = commandsData["default"];
-            } else if (!responseObj) {
-                responseObj = { text: "I don't have an answer for that.", icon: "sad" };
+            if (appUrl) {
+                speechBubble.innerText = "Открываю приложение...";
+                verityIcon.src = icons.happy;
+                setTimeout(() => {
+                    window.open(appUrl, '_blank');
+                }, 800);
+                return;
             }
 
+            // Стандартный поиск ответов в c.json
+            const responseObj = findBestMatch(cleanText);
             speechBubble.innerText = responseObj.text;
             if (icons[responseObj.icon]) {
                 verityIcon.src = icons[responseObj.icon];
             } else {
                 verityIcon.src = icons.normal;
             }
+        }
+
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const text = chatInput.value.trim();
+            if (!text) return;
+            chatInput.value = '';
+            processUserQuery(text);
         });
 
         window.addEventListener('resize', () => {
