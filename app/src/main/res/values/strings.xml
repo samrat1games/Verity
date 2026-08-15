@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Verity</string>
+    <string name="overlay_channel">Экранный ассистент</string>
+    <string name="overlay_active">Verity летает поверх приложений</string>
+</resources>
