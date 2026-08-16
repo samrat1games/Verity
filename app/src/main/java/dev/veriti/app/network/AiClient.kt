@@ -40,10 +40,13 @@ class AiClient {
             val body = JSONObject()
                 .put("model", settings.model.trim())
                 .put("messages", messages)
-                .put("temperature", 0.7)
                 .put("stream", false)
-                .toString()
-            connection.outputStream.bufferedWriter().use { it.write(body) }
+            // New Gemini Flash models reject legacy sampling parameters.
+            if (!settings.providerName.equals("Google Gemini", ignoreCase = true)) {
+                body.put("temperature", 0.7)
+            }
+            val requestBody = body.toString()
+            connection.outputStream.bufferedWriter().use { it.write(requestBody) }
 
             val code = connection.responseCode
             val response = (if (code in 200..299) connection.inputStream else connection.errorStream)
@@ -86,7 +89,10 @@ class AiClient {
                 val item = data.getJSONObject(index)
                 RemoteModel(item.getString("id"), item.optLong("created", 0L))
             }.distinctBy { it.id }
-            val nonChatMarkers = listOf("embedding", "whisper", "tts", "dall-e", "image", "moderation", "transcribe", "rerank")
+            val nonChatMarkers = listOf(
+                "embedding", "whisper", "tts", "dall-e", "image", "imagen", "veo", "lyria",
+                "live", "native-audio", "moderation", "transcribe", "rerank"
+            )
             val chatModels = allModels.filter { model ->
                 nonChatMarkers.none { marker -> model.id.contains(marker, ignoreCase = true) }
             }

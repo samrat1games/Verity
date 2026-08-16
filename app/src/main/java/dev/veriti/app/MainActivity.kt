@@ -676,7 +676,7 @@ private fun ProviderSheet(selected: String, onDismiss: () -> Unit, onSelect: (Pr
     val filtered = remember(query) { Providers.all.filter { it.name.contains(query, ignoreCase = true) } }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxHeight(.88f)) {
-            Text("50 API-провайдеров", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 24.dp))
+            Text("${Providers.all.size} API-провайдер", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 24.dp))
             Text("Выберите пресет или настройте Custom", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
             OutlinedTextField(
                 value = query,
@@ -703,6 +703,64 @@ private fun ProviderSheet(selected: String, onDismiss: () -> Unit, onSelect: (Pr
                             Text(provider.defaultModel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         if (provider.name == selected) Icon(Icons.Rounded.Check, "Выбрано", tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ModelSheet(
+    selected: String,
+    models: List<String>,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit
+) {
+    var query by rememberSaveable { mutableStateOf("") }
+    val filtered = remember(query, models) {
+        models.filter { it.contains(query.trim(), ignoreCase = true) }
+    }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.fillMaxHeight(.82f)) {
+            Text(
+                "Выберите модель",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 24.dp)
+            )
+            Text(
+                "Новые модели находятся через API и появляются здесь автоматически",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
+            )
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                placeholder = { Text("Найти модель") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shape = RoundedCornerShape(18.dp)
+            )
+            LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 28.dp)) {
+                items(filtered) { model ->
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).clickable { onSelect(model) }.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            Modifier.size(42.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) { Text(model.take(1).uppercase(), fontWeight = FontWeight.Bold) }
+                        Spacer(Modifier.width(12.dp))
+                        Text(model, Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        if (model == models.firstOrNull()) {
+                            Text("NEW", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        if (model == selected) Icon(Icons.Rounded.Check, "Выбрано", tint = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
@@ -880,6 +938,11 @@ private fun SettingsScreen(
 ) {
     var draft by remember(settings) { mutableStateOf(settings) }
     var saved by remember { mutableStateOf(false) }
+    var showModelPicker by rememberSaveable { mutableStateOf(false) }
+    val modelChoices = remember(models, draft.providerName, draft.model) {
+        val recommended = Providers.all.firstOrNull { it.name == draft.providerName }?.recommendedModels.orEmpty()
+        (models + recommended + draft.model).filter { it.isNotBlank() }.distinct()
+    }
     val context = LocalContext.current
     var overlayActive by rememberSaveable { mutableStateOf(false) }
     val overlayLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -961,11 +1024,13 @@ private fun SettingsScreen(
                         visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth()
                     )
                     Text("Модель", style = MaterialTheme.typography.labelLarge)
-                    OutlinedTextField(
-                        value = draft.model,
-                        onValueChange = { draft = draft.copy(model = it); saved = false },
-                        label = { Text("ID модели") }, singleLine = true, modifier = Modifier.fillMaxWidth()
-                    )
+                    OutlinedButton(onClick = { showModelPicker = true }, Modifier.fillMaxWidth()) {
+                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+                            Text(draft.model, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text("Нажмите, чтобы выбрать", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Icon(Icons.Rounded.AutoAwesome, null)
+                    }
                     OutlinedButton(
                         onClick = {
                             onSave(draft)
@@ -982,24 +1047,10 @@ private fun SettingsScreen(
                     }
                     if (models.isNotEmpty()) {
                         Text(
-                            "Самая новая доступная выбрана автоматически",
+                            "Новые модели добавлены в список выбора",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        models.take(12).forEachIndexed { index, model ->
-                            OutlinedButton(
-                                onClick = {
-                                    draft = draft.copy(model = model)
-                                    onSelectModel(model)
-                                    saved = true
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(model, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                if (index == 0) Text("NEW", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                                if (model == draft.model) Icon(Icons.Rounded.Check, "Выбрано")
-                            }
-                        }
                     }
                     if (modelError != null) {
                         Text(modelError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
@@ -1111,6 +1162,20 @@ private fun SettingsScreen(
                 }
             }
         }
+    }
+
+    if (showModelPicker) {
+        ModelSheet(
+            selected = draft.model,
+            models = modelChoices,
+            onDismiss = { showModelPicker = false },
+            onSelect = { model ->
+                draft = draft.copy(model = model)
+                onSelectModel(model)
+                saved = true
+                showModelPicker = false
+            }
+        )
     }
 }
 

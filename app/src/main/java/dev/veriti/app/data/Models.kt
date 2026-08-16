@@ -18,7 +18,8 @@ data class Provider(
     val name: String,
     val baseUrl: String,
     val defaultModel: String,
-    val hint: String = "OpenAI-compatible"
+    val hint: String = "OpenAI-compatible",
+    val recommendedModels: List<String> = listOf(defaultModel)
 )
 
 data class AppSettings(
@@ -34,6 +35,18 @@ object Providers {
     // Presets use the provider's OpenAI-compatible endpoint or a configurable gateway URL.
     val all = listOf(
         Provider("OpenAI", "https://api.openai.com/v1", "gpt-4.1-mini"),
+        Provider(
+            "Google Gemini",
+            "https://generativelanguage.googleapis.com/v1beta/openai",
+            "gemini-3.6-flash",
+            recommendedModels = listOf(
+                "gemini-3.6-flash",
+                "gemini-3.5-flash",
+                "gemini-3.5-flash-lite",
+                "gemini-3.1-pro-preview",
+                "gemini-3.1-flash-lite"
+            )
+        ),
         Provider("OpenRouter", "https://openrouter.ai/api/v1", "openai/gpt-4.1-mini"),
         Provider("Groq", "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
         Provider("Mistral AI", "https://api.mistral.ai/v1", "mistral-small-latest"),
