@@ -76,6 +76,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -166,7 +167,17 @@ private fun VeritiTheme(content: @Composable () -> Unit) {
     val scheme = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
     } else if (dark) VeritiDark else VeritiLight
-    MaterialTheme(colorScheme = scheme, content = content)
+    MaterialTheme(
+        colorScheme = scheme,
+        shapes = Shapes(
+            extraSmall = RoundedCornerShape(10.dp),
+            small = RoundedCornerShape(16.dp),
+            medium = RoundedCornerShape(24.dp),
+            large = RoundedCornerShape(32.dp),
+            extraLarge = RoundedCornerShape(44.dp)
+        ),
+        content = content
+    )
 }
 
 private enum class Screen { CHAT, SETTINGS, ABOUT }
@@ -341,9 +352,11 @@ private fun VeritiApp(vm: ChatViewModel = viewModel()) {
     val scope = rememberCoroutineScope()
     var screen by rememberSaveable { mutableStateOf(Screen.CHAT) }
     var showProviders by rememberSaveable { mutableStateOf(false) }
+    var showGeminiHelp by rememberSaveable { mutableStateOf(false) }
     val voiceText = AssistantBridge.pendingVoiceText
     val newChatRequested = AssistantBridge.pendingNewChat
     val focusComposer = AssistantBridge.focusComposerRequested
+    val chatRevision = AssistantBridge.chatRevision
 
     LaunchedEffect(Unit) { vm.checkForUpdates() }
 
@@ -360,6 +373,9 @@ private fun VeritiApp(vm: ChatViewModel = viewModel()) {
             screen = Screen.CHAT
             AssistantBridge.pendingNewChat = false
         }
+    }
+    LaunchedEffect(chatRevision) {
+        if (chatRevision > 0L) vm.reloadChats(AssistantBridge.lastOverlayChatId)
     }
     LaunchedEffect(screen, state.settings.baseUrl, state.settings.apiKey) {
         if (screen == Screen.SETTINGS && state.models.isEmpty() && state.settings.apiKey.isNotBlank()) {
@@ -394,8 +410,10 @@ private fun VeritiApp(vm: ChatViewModel = viewModel()) {
                 isLoading = state.isLoading,
                 error = state.error,
                 focusComposer = focusComposer,
+                showApiSuggestion = state.settings.apiKey.isBlank(),
                 onMenu = { scope.launch { drawerState.open() } },
                 onProvider = { showProviders = true },
+                onGeminiSuggestion = { showGeminiHelp = true },
                 onSend = vm::send,
                 onComposerFocused = { AssistantBridge.focusComposerRequested = false },
                 onDismissError = vm::clearError
@@ -429,6 +447,16 @@ private fun VeritiApp(vm: ChatViewModel = viewModel()) {
                 vm.selectProvider(it)
                 if (state.settings.apiKey.isNotBlank()) vm.refreshModels(autoSelectNewest = true)
                 showProviders = false
+            }
+        )
+    }
+    if (showGeminiHelp) {
+        GeminiHelpDialog(
+            onDismiss = { showGeminiHelp = false },
+            onOpenSettings = {
+                Providers.all.firstOrNull { it.name == "Google Gemini" }?.let(vm::selectProvider)
+                screen = Screen.SETTINGS
+                showGeminiHelp = false
             }
         )
     }
@@ -505,8 +533,10 @@ private fun ChatScreen(
     isLoading: Boolean,
     error: String?,
     focusComposer: Boolean,
+    showApiSuggestion: Boolean,
     onMenu: () -> Unit,
     onProvider: () -> Unit,
+    onGeminiSuggestion: () -> Unit,
     onSend: (String) -> Unit,
     onComposerFocused: () -> Unit,
     onDismissError: () -> Unit
@@ -545,7 +575,12 @@ private fun ChatScreen(
         }
     ) { padding ->
         if (chat.messages.isEmpty()) {
-            EmptyPet(modifier = Modifier.fillMaxSize().padding(padding))
+            Column(Modifier.fillMaxSize().padding(padding)) {
+                if (showApiSuggestion) {
+                    GeminiSuggestionCard(onClick = onGeminiSuggestion, modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp))
+                }
+                EmptyPet(modifier = Modifier.fillMaxWidth().weight(1f))
+            }
         } else {
             LazyColumn(
                 state = listState,
@@ -553,6 +588,7 @@ private fun ChatScreen(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+                if (showApiSuggestion) item { GeminiSuggestionCard(onClick = onGeminiSuggestion) }
                 items(chat.messages, key = { it.id }) { MessageBubble(it) }
                 if (isLoading) item { TypingBubble() }
             }
@@ -567,6 +603,55 @@ private fun ChatScreen(
             confirmButton = { TextButton(onClick = onDismissError) { Text("Понятно") } }
         )
     }
+}
+
+@Composable
+private fun GeminiSuggestionCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Card(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
+                Icon(Icons.Rounded.AutoAwesome, null, Modifier.padding(12.dp), tint = MaterialTheme.colorScheme.onPrimary)
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Может, Gemini?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("Нажмите — покажу, как бесплатно получить API-ключ", color = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+            Text("›", style = MaterialTheme.typography.headlineMedium)
+        }
+    }
+}
+
+@Composable
+private fun GeminiHelpDialog(onDismiss: () -> Unit, onOpenSettings: () -> Unit) {
+    val context = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Rounded.AutoAwesome, null) },
+        title = { Text("Как подключить Gemini") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("1. Откройте Google AI Studio и войдите в Google.")
+                Text("2. Нажмите Create API key.")
+                Text("3. Скопируйте созданный ключ.")
+                Text("4. В настройках Verity выберите Google Gemini и вставьте ключ в поле «API-ключ».")
+                Text("Ключ хранится только на вашем устройстве.", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/app/apikey")))
+            }) { Text("Открыть AI Studio") }
+        },
+        dismissButton = {
+            TextButton(onClick = onOpenSettings) { Text("Перейти в настройки") }
+        }
+    )
 }
 
 @Composable
@@ -824,7 +909,7 @@ private fun AboutScreen(onBack: () -> Unit) {
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                     Text(
-                        "Версия 0.1.0",
+                        "Версия ${BuildConfig.VERSION_NAME}",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .72f)
                     )
@@ -1000,7 +1085,7 @@ private fun SettingsScreen(
                         Spacer(Modifier.width(18.dp))
                         Column {
                             Text("Verity", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                            Text("Настройки приложения", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Material You 3 · версия ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -1112,7 +1197,9 @@ private fun SettingsScreen(
                             Spacer(Modifier.width(10.dp)); Text("Проверяю…")
                         }
                     } else if (update != null) {
-                        if (update.hasApk) {
+                        if (update.isUpToDate) {
+                            Text("Вы обновились до самой новой версии!", style = MaterialTheme.typography.bodyLarge, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                        } else if (update.hasApk) {
                             Text("Доступно обновление: ${update.name}", style = MaterialTheme.typography.bodyLarge)
                             Button(
                                 onClick = {

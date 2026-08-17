@@ -47,6 +47,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         state = state.copy(currentChat = Chat(), error = null)
     }
 
+    fun reloadChats(openChatId: Long? = null) {
+        val chats = store.loadChats()
+        val current = openChatId?.let { id -> chats.firstOrNull { it.id == id } }
+            ?: chats.firstOrNull { it.id == state.currentChat.id }
+            ?: state.currentChat
+        state = state.copy(chats = chats, currentChat = current)
+    }
+
     fun openChat(id: Long) {
         state.chats.firstOrNull { it.id == id }?.let { state = state.copy(currentChat = it, error = null) }
     }

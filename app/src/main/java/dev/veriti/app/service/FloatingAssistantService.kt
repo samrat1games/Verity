@@ -32,6 +32,16 @@ import androidx.core.content.ContextCompat
 import dev.veriti.app.MainActivity
 import dev.veriti.app.R
 import dev.veriti.app.data.AssistantBridge
+import dev.veriti.app.data.Chat
+import dev.veriti.app.data.ChatStore
+import dev.veriti.app.data.Message
+import dev.veriti.app.network.AiClient
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.random.Random
@@ -51,6 +61,12 @@ class FloatingAssistantService : Service() {
     private var speechPages: List<String> = emptyList()
     private var speechPage = 0
     private var listening = false
+    private var requestInFlight = false
+    private var overlayChatId: Long? = null
+    private var startNewOverlayChat = false
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val chatStore by lazy { ChatStore(applicationContext) }
+    private val aiClient = AiClient()
 
     private val wanderRunnable = object : Runnable {
         override fun run() {
@@ -113,6 +129,8 @@ class FloatingAssistantService : Service() {
             setOnClickListener {
                 closeSpeech()
                 AssistantBridge.pendingNewChat = true
+                startNewOverlayChat = true
+                overlayChatId = null
             }
         }
         val actions = LinearLayout(this).apply {
@@ -363,8 +381,7 @@ class FloatingAssistantService : Service() {
                     if (!text.isNullOrBlank()) {
                         speechCard.visibility = View.GONE
                         character.setImageResource(R.drawable.verity_happy_cutout)
-                        AssistantBridge.pendingVoiceText = text
-                        openApp()
+                        sendVoiceMessage(text)
                     } else showSpeech("Я ничего не услышал.", "sad")
                 }
                 override fun onPartialResults(partialResults: Bundle?) = Unit
@@ -374,6 +391,10 @@ class FloatingAssistantService : Service() {
     }
 
     private fun startListening() {
+        if (requestInFlight) {
+            showSpeech("Подожди немного, я ещё думаю над прошлой фразой.", "normal")
+            return
+        }
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             showSpeech("Мне нужно разрешение на микрофон, иначе я тебя не услышу.", "sad")
             return
@@ -384,7 +405,56 @@ class FloatingAssistantService : Service() {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_PROMPT, "Говорите с Verity")
-        }) ?: openApp()
+        }) ?: showSpeech("На этом устройстве распознавание речи недоступно.", "sad")
+    }
+
+    private fun sendVoiceMessage(text: String) {
+        val settings = chatStore.loadSettings()
+        if (settings.apiKey.isBlank() && !settings.baseUrl.startsWith("http://10.0.2.2")) {
+            showSpeech("Сначала добавь API-ключ в настройках. Например, можно быстро подключить Gemini.", "sad")
+            return
+        }
+        requestInFlight = true
+        showSpeech("Секунду…", "normal")
+        val createNewChat = startNewOverlayChat
+        startNewOverlayChat = false
+        serviceScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val chats = chatStore.loadChats()
+                    val base = if (createNewChat) null else {
+                        overlayChatId?.let { id -> chats.firstOrNull { it.id == id } } ?: chats.firstOrNull()
+                    } ?: Chat()
+                    val userMessage = Message(role = "user", content = text.trim())
+                    val pending = base.copy(
+                        title = if (base.messages.isEmpty()) text.replace('\n', ' ').take(42) else base.title,
+                        messages = base.messages + userMessage,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                    val rememberedHistory = chats
+                        .filterNot { it.id == base.id }
+                        .sortedByDescending { it.updatedAt }
+                        .take(5)
+                        .flatMap { it.messages.takeLast(6) }
+                        .takeLast(24) + pending.messages
+                    chatStore.saveChats((chats.filterNot { it.id == pending.id } + pending).sortedByDescending { it.updatedAt })
+                    val answer = aiClient.complete(settings, rememberedHistory)
+                    val complete = pending.copy(
+                        messages = pending.messages + Message(role = "assistant", content = answer.text),
+                        updatedAt = System.currentTimeMillis()
+                    )
+                    chatStore.saveChats((chats.filterNot { it.id == complete.id } + complete).sortedByDescending { it.updatedAt })
+                    Triple(answer.text, answer.mood, complete.id)
+                }
+            }.onSuccess { (answer, mood, chatId) ->
+                overlayChatId = chatId
+                AssistantBridge.notifyOverlayChatChanged(chatId)
+                showSpeech(answer, mood)
+            }.onFailure { error ->
+                showSpeech(error.message?.take(220) ?: "Не получилось связаться с API. Проверь настройки.", "sad")
+            }
+            requestInFlight = false
+        }
     }
 
     private fun setListeningVisual(value: Boolean) {
@@ -415,6 +485,7 @@ class FloatingAssistantService : Service() {
         speechRecognizer?.destroy()
         speechRecognizer = null
         AssistantBridge.onAssistantReply = null
+        serviceScope.cancel()
         bubble?.let { windowManager.removeView(it) }
         bubble = null
         super.onDestroy()

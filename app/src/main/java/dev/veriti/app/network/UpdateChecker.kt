@@ -1,14 +1,17 @@
 package dev.veriti.app.network
 
+import dev.veriti.app.BuildConfig
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
 data class ReleaseUpdate(
     val name: String,
+    val version: String,
     val pageUrl: String,
     val apkUrl: String? = null,
-    val apkName: String? = null
+    val apkName: String? = null,
+    val isUpToDate: Boolean = false
 ) {
     val hasApk: Boolean get() = !apkUrl.isNullOrBlank()
 }
@@ -21,7 +24,7 @@ class UpdateChecker {
             connection.connectTimeout = 20_000
             connection.readTimeout = 25_000
             connection.setRequestProperty("Accept", "application/vnd.github+json")
-            connection.setRequestProperty("User-Agent", "VerityDroid/0.1.0")
+            connection.setRequestProperty("User-Agent", "VerityDroid/${BuildConfig.VERSION_NAME}")
             val code = connection.responseCode
             val body = (if (code in 200..299) connection.inputStream else connection.errorStream)
                 ?.bufferedReader()?.use { it.readText() }.orEmpty()
@@ -41,19 +44,35 @@ class UpdateChecker {
                     }
                 }
             }
+            val remoteVersion = json.optString("tag_name")
+                .ifBlank { json.optString("name", "0.0.0") }
+                .removePrefix("v")
+                .trim()
             return ReleaseUpdate(
-                name = json.optString("name", "Verity"),
+                name = json.optString("name", remoteVersion),
+                version = remoteVersion,
                 pageUrl = json.optString("html_url", RELEASE_PAGE),
                 apkUrl = apkUrl,
-                apkName = apkName
+                apkName = apkName,
+                isUpToDate = compareVersions(BuildConfig.VERSION_NAME, remoteVersion) >= 0
             )
         } finally {
             connection.disconnect()
         }
     }
 
+    private fun compareVersions(local: String, remote: String): Int {
+        val left = local.removePrefix("v").split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
+        val right = remote.removePrefix("v").split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
+        repeat(maxOf(left.size, right.size)) { index ->
+            val result = (left.getOrNull(index) ?: 0).compareTo(right.getOrNull(index) ?: 0)
+            if (result != 0) return result
+        }
+        return 0
+    }
+
     companion object {
-        const val RELEASE_PAGE = "https://github.com/samrat1games/Verity/releases/tag/Verity"
-        private const val RELEASE_API = "https://api.github.com/repos/samrat1games/Verity/releases/tags/Verity"
+        const val RELEASE_PAGE = "https://github.com/samrat1games/Verity/releases/latest"
+        private const val RELEASE_API = "https://api.github.com/repos/samrat1games/Verity/releases/latest"
     }
 }
